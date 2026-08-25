@@ -35,4 +35,15 @@
    ```
 7. 차트마다 `st.subheader()`로 제목을 붙이고, 차트 아래에 `st.markdown()`으로 **그 차트에서 읽어낼 수 있는 인사이트를 2~3문장으로 서술**하세요. 숫자를 근거로 구체적으로 쓰고, "차트를 참고하세요" 같은 빈 문장은 쓰지 마세요.
 8. 마지막에 `st.subheader("종합 결론")`과 함께 전체 분석을 요약하는 문단을 `st.markdown()`으로 작성하세요.
-9. 설명이나 다른 텍스트 없이, **오직 실행 가능한 파이썬 코드만** 백틱(```python ... ```)으로 감싸서 출력하세요.
+9. **컬럼명·인덱스 자리에 람다나 함수를 넣지 마세요.** `set_axis()`, `pd.DataFrame(columns=...)`, `groupby()`, `set_index()`, `sort_values(by=...)` 에는 문자열이나 문자열 리스트만 들어갑니다. 함수를 넣으면 `Index(...) must be called with a collection of some kind` 오류로 실행이 중단됩니다.
+   특히 다단 컬럼을 평탄화할 때 `set_axis`에 함수를 넘기기 쉬운데, 반드시 리스트로 만들어 넘기세요.
+   ```python
+   # 안 됨: summary.set_axis(lambda c: '_'.join(c), axis=1)
+   summary.columns = ['_'.join(c) for c in summary.columns]
+   ```
+   애초에 다단 컬럼을 만들지 않는 아래 형태가 가장 안전합니다.
+   ```python
+   summary = df.groupby('담당자', as_index=False)['실적'].sum()
+   summary = df.groupby('담당자').agg(총실적=('실적', 'sum'), 건수=('실적', 'count')).reset_index()
+   ```
+10. 설명이나 다른 텍스트 없이, **오직 실행 가능한 파이썬 코드만** 백틱(```python ... ```)으로 감싸서 출력하세요.

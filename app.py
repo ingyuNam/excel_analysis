@@ -9,7 +9,7 @@ from config import (
     register_korean_font,
 )
 from core.ai_analyzer import generate_analysis_code
-from core.code_runner import run_analysis_code
+from core.code_runner import AnalysisCodeError, run_analysis_code
 from core.data_loader import (
     build_dataframe,
     describe_dataframe,
@@ -92,8 +92,23 @@ if st.session_state.analysis_code:
         report_elements = run_analysis_code(
             st.session_state.analysis_code, df, chart_path, get_matplotlib_font_path()
         )
+    except AnalysisCodeError as e:
+        # 어디서 터졌는지 보여줘야 재생성이 나을지 데이터가 문제인지 판단할 수 있다.
+        location = f" ({e.lineno}번째 줄)" if e.lineno else ""
+        st.error(f"코드 실행 중 오류 발생{location}: {e}")
+        if e.source_line:
+            st.code(e.source_line, language="python")
+        report_elements = e.elements  # 터지기 전까지 그려진 내용은 PDF에 살린다
+        if report_elements:
+            st.warning(
+                "오류 지점 앞까지는 정상적으로 생성되었습니다. "
+                "이 부분만으로 PDF를 받거나, 아래에서 리포트를 다시 생성해 보세요."
+            )
     except Exception as e:
         st.error(f"코드 실행 중 오류 발생: {e}")
+
+    with st.expander("🔍 생성된 분석 코드 보기", expanded=False):
+        st.code(st.session_state.analysis_code, language="python", line_numbers=True)
 
     st.markdown("---")
     st.subheader("📄 PDF 리포트 다운로드")
