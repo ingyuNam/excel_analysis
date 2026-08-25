@@ -1,0 +1,19 @@
+# 환경 변수 / 시크릿
+.env
+.streamlit/secrets.toml
+
+# 가상환경
+.venv/
+venv/
+
+# 파이썬 캐시
+__pycache__/
+*.py[cod]
+
+# IDE
+.idea/
+.vscode/
+
+# 실행 중 생기는 산출물
+temp_chart.png
+*.pdf
