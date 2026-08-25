@@ -1,9 +1,11 @@
 import io
 import os
 import re
+from xml.sax.saxutils import escape
 
 import pandas as pd
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
@@ -21,6 +23,10 @@ from reportlab.platypus import (
 PAGE_WIDTH = A4[0] - 80  # 좌우 여백 40씩 제외한 사용 가능 폭
 MAX_TABLE_ROWS = 15
 MAX_TABLE_COLS = 8
+
+# 지표 값이 칸을 넘칠 때 이 순서로 줄여 본다. 마지막 크기로도 안 맞으면 줄바꿈한다.
+METRIC_VALUE_SIZES = (13, 12, 11, 10, 9, 8)
+METRIC_CELL_PADDING = 12  # 셀 좌우 패딩 합계
 
 
 def _bold_of(font_name: str) -> str:
@@ -70,26 +76,52 @@ def _image_flowable(png: bytes, max_width: float = PAGE_WIDTH) -> RLImage:
     return RLImage(io.BytesIO(png), width=width * scale, height=height * scale)
 
 
+def _fit_font_size(texts: list[str], font_name: str, available: float) -> float:
+    """모든 값이 칸 안에 들어가는 가장 큰 글자 크기. 다 안 맞으면 최소 크기."""
+    for size in METRIC_VALUE_SIZES:
+        if all(pdfmetrics.stringWidth(t, font_name, size) <= available for t in texts):
+            return size
+    return METRIC_VALUE_SIZES[-1]
+
+
 def _metric_table(metrics: list[dict], font_name: str) -> Table:
-    """연속된 st.metric들을 한 줄짜리 카드 형태로 묶는다."""
+    """연속된 st.metric들을 한 줄짜리 카드 형태로 묶는다.
+
+    셀에 평문 문자열을 넣으면 ReportLab이 줄바꿈하지 않고 칸 밖으로 흘려보낸다.
+    "2,551,455,598원" 같은 긴 금액이 옆 칸을 침범하므로, Paragraph로 감싸 줄바꿈이
+    가능하게 하고 글자 크기도 칸 폭에 맞춰 줄인다.
+    """
     labels = [m["label"] for m in metrics]
     values = [m["value"] + (f" ({m['delta']})" if m.get("delta") else "") for m in metrics]
     col_width = PAGE_WIDTH / len(metrics)
-    table = Table([labels, values], colWidths=[col_width] * len(metrics))
+    available = col_width - METRIC_CELL_PADDING
+    bold_name = _bold_of(font_name)
+    value_size = _fit_font_size(values, bold_name, available)
+
+    label_style = ParagraphStyle(
+        "MetricLabel", fontName=font_name, fontSize=9, leading=11,
+        alignment=TA_CENTER, textColor=colors.HexColor("#6c757d"),
+    )
+    value_style = ParagraphStyle(
+        "MetricValue", fontName=bold_name, fontSize=value_size, leading=value_size + 3,
+        alignment=TA_CENTER, textColor=colors.HexColor("#212529"),
+    )
+    rows = [
+        [Paragraph(escape(text), label_style) for text in labels],
+        [Paragraph(escape(text), value_style) for text in values],
+    ]
+    table = Table(rows, colWidths=[col_width] * len(metrics))
+    # 글꼴·정렬·색은 Paragraph가 들고 있으므로 표에는 테두리와 여백만 남긴다.
     table.setStyle(
         TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8f9fa")),
             ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#dee2e6")),
             ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dee2e6")),
-            ("FONTNAME", (0, 0), (-1, 0), font_name),
-            ("FONTNAME", (0, 1), (-1, 1), _bold_of(font_name)),
-            ("FONTSIZE", (0, 0), (-1, 0), 9),
-            ("FONTSIZE", (0, 1), (-1, 1), 13),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#6c757d")),
-            ("TEXTCOLOR", (0, 1), (-1, 1), colors.HexColor("#212529")),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("TOPPADDING", (0, 0), (-1, -1), 6),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), METRIC_CELL_PADDING / 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), METRIC_CELL_PADDING / 2),
         ])
     )
     return table

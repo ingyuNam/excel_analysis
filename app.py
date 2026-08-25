@@ -18,6 +18,28 @@ from core.pdf_report import build_report
 
 st.title("📊 엑셀/데이터 분석 앱")
 
+# Streamlit은 st.metric 값을 truncate=true로 렌더링해서 "2,551,455,598원" 같은
+# 긴 금액이 말줄임으로 잘린다. 잘라내는 대신 줄바꿈하도록 되돌린다.
+st.markdown(
+    """
+    <style>
+    [data-testid="stMetricValue"] {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+        font-size: clamp(1rem, 2.2vw, 1.75rem);
+    }
+    [data-testid="stMetricLabel"] {
+        white-space: normal !important;
+        overflow: visible !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # 키가 없으면 분석 단계에서야 알 수 없는 에러로 터지므로 진입 시점에 막는다.
 if not GENAI_API_KEY:
     st.error(
