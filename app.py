@@ -88,12 +88,15 @@ if st.session_state.analysis_code:
     st.subheader("📈 AI 분석 리포트")
     # 화면에 렌더링된 내용이 그대로 기록되어 PDF 본문이 된다
     report_elements: list[dict] = []
+    # 생성된 코드는 리포트 독자에게 의미 없는 정보라 평소엔 감추고, 실패했을 때만 편다.
+    failed = False
     try:
         report_elements = run_analysis_code(
             st.session_state.analysis_code, df, chart_path, get_matplotlib_font_path()
         )
     except AnalysisCodeError as e:
         # 어디서 터졌는지 보여줘야 재생성이 나을지 데이터가 문제인지 판단할 수 있다.
+        failed = True
         location = f" ({e.lineno}번째 줄)" if e.lineno else ""
         st.error(f"코드 실행 중 오류 발생{location}: {e}")
         if e.source_line:
@@ -105,10 +108,12 @@ if st.session_state.analysis_code:
                 "이 부분만으로 PDF를 받거나, 아래에서 리포트를 다시 생성해 보세요."
             )
     except Exception as e:
+        failed = True
         st.error(f"코드 실행 중 오류 발생: {e}")
 
-    with st.expander("🔍 생성된 분석 코드 보기", expanded=False):
-        st.code(st.session_state.analysis_code, language="python", line_numbers=True)
+    if failed:
+        with st.expander("🔍 생성된 분석 코드 전체 보기", expanded=False):
+            st.code(st.session_state.analysis_code, language="python", line_numbers=True)
 
     st.markdown("---")
     st.subheader("📄 PDF 리포트 다운로드")
