@@ -12,6 +12,10 @@ import pandas as pd
 MAX_HEADER_SCAN = 12  # 헤더를 찾기 위해 훑어볼 상단 행 수
 MERGED_FILL_THRESHOLD = 0.6  # 이 비율 미만으로 채워진 열은 병합 셀로 간주
 
+# 숫자 앞뒤에 붙어 변환을 막는 것들: 자릿수 쉼표, 공백, 통화 기호.
+# 퍼센트(%)는 값의 의미가 바뀌므로 일부러 건드리지 않는다.
+_NUMERIC_NOISE = r"[,\s]|원|₩|\$|€|¥"
+
 
 def read_raw(uploaded_file) -> pd.DataFrame:
     """헤더 추정 없이 원본 격자를 그대로 읽는다. 완전히 빈 행/열만 걷어낸다."""
@@ -107,15 +111,19 @@ def _fill_merged_cells(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """"500,000" 같은 문자열 숫자를 실제 숫자 컬럼으로 되돌린다.
+    """"500,000원" 같은 문자열 숫자를 실제 숫자 컬럼으로 되돌린다.
 
     값이 있는 칸이 모두 숫자로 해석될 때만 변환한다. 하나라도 아니면 원본을 유지한다.
+    쉼표만 떼면 "11,983,860원"이 "11983860원"으로 남아 변환에 실패하므로
+    통화 기호와 단위도 함께 걷어낸다.
     """
     for col in df.columns:
         series = df[col]
         if series.dtype != object:
             continue
-        cleaned = series.astype(str).str.replace(",", "", regex=False).str.strip()
+        cleaned = (
+            series.astype(str).str.replace(_NUMERIC_NOISE, "", regex=True).str.strip()
+        )
         has_value = series.notna() & (cleaned != "")
         if not has_value.any():
             continue
