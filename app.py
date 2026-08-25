@@ -1,5 +1,3 @@
-import os
-
 import streamlit as st
 
 from config import (
@@ -120,13 +118,10 @@ if st.session_state.analysis_code:
 
     if st.button("📥 분석 결과 PDF 생성하기"):
         try:
-            # 생성된 코드가 CHART_PATH 대신 예전 경로에 저장했을 경우를 대비한 폴백
-            saved_chart = chart_path
-            if not os.path.exists(saved_chart) and os.path.exists("temp_chart.png"):
-                saved_chart = "temp_chart.png"
-
+            # 차트 경로는 세션별 임시 디렉터리만 쓴다. 공유 경로로 폴백하면
+            # 동시 접속 시 다른 사람의 차트가 내 PDF에 섞여 들어간다.
             pdf_buffer = build_report(
-                df, uploaded_file.name, saved_chart, font_name, report_elements
+                df, uploaded_file.name, chart_path, font_name, report_elements
             )
 
             st.download_button(

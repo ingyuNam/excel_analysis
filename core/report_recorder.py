@@ -8,6 +8,8 @@ import io
 
 import pandas as pd
 
+from core.chart_layout import tidy_figure
+
 # 텍스트로 기록할 메서드 → 제목 레벨(0이면 본문)
 _TEXT_METHODS = {
     "title": 1,
@@ -115,6 +117,10 @@ class _RecordingProxy:
 
         elif name in ("plotly_chart", "pyplot", "altair_chart", "image"):
             if args:
+                # 기록보다 먼저 손봐야 화면과 PDF 양쪽에 보정이 반영된다.
+                # _record는 실제 st.pyplot() 호출 직전에 돌기 때문이다.
+                if name == "pyplot" and hasattr(args[0], "savefig"):
+                    tidy_figure(args[0])
                 png = _fig_to_png(args[0])
                 if png:
                     rec.add(type="image", png=png)
